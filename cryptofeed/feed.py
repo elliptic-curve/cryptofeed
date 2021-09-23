@@ -20,6 +20,11 @@ from cryptofeed.defines import (ASK, BALANCES, BID, CANDLES, FUNDING, INDEX, L2_
 from cryptofeed.exceptions import BidAskOverlapping
 from cryptofeed.types import OrderBook
 
+import pyximport
+pyximport.install()
+
+from cryptofeed.types import OrderBook
+
 
 LOG = logging.getLogger('feedhandler')
 
@@ -237,4 +242,4 @@ class Feed(Exchange):
                     cb_name = callback.__class__.__name__ if hasattr(callback, '__class__') else callback.__name__
                     LOG.info('%s: starting backend task %s', self.id, cb_name)
                     # Backends start tasks to write messages
-                    callback.start(loop)
+                    callback.start

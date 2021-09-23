@@ -8,7 +8,7 @@ from datetime import datetime as dt
 from typing import Tuple
 
 import asyncpg
-from yapic import json
+import json
 
 from cryptofeed.backends.backend import BackendBookCallback, BackendCallback, BackendQueue
 from cryptofeed.defines import CANDLES, FUNDING, OPEN_INTEREST, TICKER, TRADES, LIQUIDATIONS, INDEX

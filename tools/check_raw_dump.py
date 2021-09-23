@@ -8,7 +8,12 @@ import ast
 import sys
 import zlib
 
-from yapic import json
+import json
+
+
+def bytes_string_to_bytes(string):
+    tree = ast.parse(string)
+    return tree.body[0].value.s
 
 
 def bytes_string_to_bytes(string):

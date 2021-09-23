@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Dict, Tuple
 from collections import defaultdict
 
-from yapic import json
+import json
 
 from cryptofeed.connection import AsyncConnection
 from cryptofeed.defines import BID, ASK, BUY, COINBASE, L2_BOOK, L3_BOOK, SELL, TICKER, TRADES

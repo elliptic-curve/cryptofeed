@@ -6,7 +6,7 @@ associated with this software.
 '''
 import asyncio
 import aioredis
-from yapic import json
+import json
 
 from cryptofeed.backends.backend import BackendBookCallback, BackendCallback, BackendQueue
 

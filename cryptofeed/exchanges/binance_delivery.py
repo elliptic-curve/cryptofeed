@@ -8,7 +8,7 @@ from decimal import Decimal
 import logging
 from typing import Tuple
 
-from yapic import json
+import json
 
 from cryptofeed.defines import BINANCE_DELIVERY, FUNDING, LIQUIDATIONS, OPEN_INTEREST
 from cryptofeed.exchanges.binance import Binance
