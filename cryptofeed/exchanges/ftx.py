@@ -90,6 +90,7 @@ class FTX(Feed, FTXRestMixin):
 
     def __init__(self, **kwargs):
         super().__init__('wss://ftexchange.com/ws/', **kwargs)
+        self.ws_defaults['compression'] = None
 
     def __reset(self):
         self._l2_book = {}
@@ -171,7 +172,7 @@ class FTX(Feed, FTXRestMixin):
                     if oi != self._open_interest_cache.get(pair, None):
                         o = OpenInterest(
                             self.id,
-                            pair,
+                            self.exchange_symbol_to_std_symbol(pair),
                             oi,
                             None,
                             raw=data

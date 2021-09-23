@@ -5,15 +5,18 @@ Please see the LICENSE file for the terms and conditions
 associated with this software.
 '''
 import logging
-from asyncio import create_task
+from asyncio import create_task, sleep
 from collections import defaultdict, deque
 from decimal import Decimal
+import requests
+import time
 from typing import Dict, Union, Tuple
+from urllib.parse import urlencode
 
 import json
 
 from cryptofeed.connection import AsyncConnection, HTTPPoll, HTTPConcurrentPoll
-from cryptofeed.defines import BID, ASK, BINANCE, BUY, CANDLES, FUNDING, FUTURES, L2_BOOK, LIQUIDATIONS, OPEN_INTEREST, PERPETUAL, SELL, SPOT, TICKER, TRADES, FILLED, UNFILLED
+from cryptofeed.defines import ASK, BALANCES, BID, BINANCE, BUY, CANDLES, FUNDING, FUTURES, L2_BOOK, LIQUIDATIONS, OPEN_INTEREST, PERPETUAL, SELL, SPOT, TICKER, TRADES, FILLED, UNFILLED
 from cryptofeed.feed import Feed
 from cryptofeed.symbols import Symbol
 from cryptofeed.exchanges.mixins.binance_rest import BinanceRestMixin
@@ -26,6 +29,7 @@ LOG = logging.getLogger('feedhandler')
 class Binance(Feed, BinanceRestMixin):
     id = BINANCE
     symbol_endpoint = 'https://api.binance.com/api/v3/exchangeInfo'
+    listen_key_endpoint = 'userDataStream'
     valid_depths = [5, 10, 20, 50, 100, 500, 1000, 5000]
     # m -> minutes; h -> hours; d -> days; w -> weeks; M -> months
     valid_candle_intervals = {'1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'}
@@ -34,7 +38,8 @@ class Binance(Feed, BinanceRestMixin):
         L2_BOOK: 'depth',
         TRADES: 'aggTrade',
         TICKER: 'bookTicker',
-        CANDLES: 'kline_'
+        CANDLES: 'kline_',
+        BALANCES: BALANCES
     }
     request_limit = 20
 
@@ -66,10 +71,8 @@ class Binance(Feed, BinanceRestMixin):
             info['instrument_type'][s.normalized] = stype
         return ret, info
 
-    def __init__(self, candle_interval='1m', candle_closed_only=False, depth_interval='100ms', concurrent_http=False, **kwargs):
+    def __init__(self, candle_closed_only=False, depth_interval='100ms', concurrent_http=False, **kwargs):
         """
-        candle_interval: str
-            time between candles updates ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M']
         candle_closed_only: bool
             return only closed candles, i.e. no updates in between intervals.
         depth_interval: str
@@ -77,19 +80,17 @@ class Binance(Feed, BinanceRestMixin):
         concurrent_http: bool
             http requests will be made concurrently, if False requests will be made one at a time (affects L2_BOOK, OPEN_INTEREST).
         """
-        if candle_interval not in self.valid_candle_intervals:
-            raise ValueError(f"Candle interval must be one of {self.valid_candle_intervals}")
         if depth_interval is not None and depth_interval not in self.valid_depth_intervals:
             raise ValueError(f"Depth interval must be one of {self.valid_depth_intervals}")
 
         super().__init__({}, **kwargs)
         self.ws_endpoint = 'wss://stream.binance.com:9443'
-        self.rest_endpoint = 'https://www.binance.com/api/v1'
-        self.candle_interval = candle_interval
+        self.rest_endpoint = 'https://www.binance.com/api/v3'
         self.candle_closed_only = candle_closed_only
         self.depth_interval = depth_interval
         self.address = self._address()
         self.concurrent_http = concurrent_http
+        self.token = None
 
         self._open_interest_cache = {}
         self._reset()
@@ -104,12 +105,23 @@ class Binance(Feed, BinanceRestMixin):
         The generic connect method supplied by Feed will take care of creating the
         correct connection objects from the addresses.
         """
-        address = self.ws_endpoint + '/stream?streams='
+        if self.requires_authentication:
+            listen_key = self._generate_token()
+            address = self.ws_endpoint + '/ws/' + listen_key
+        else:
+            address = self.ws_endpoint + '/stream?streams='
         subs = []
+
+        is_any_private = any(self.is_authenticated_channel(chan) for chan in self.subscription)
+        is_any_public = any(not self.is_authenticated_channel(chan) for chan in self.subscription)
+        if is_any_private and is_any_public:
+            raise ValueError("Private and public channels should be subscribed to in separate feeds")
 
         for chan in self.subscription:
             normalized_chan = self.exchange_channel_to_std(chan)
             if normalized_chan == OPEN_INTEREST:
+                continue
+            if self.is_authenticated_channel(normalized_chan):
                 continue
 
             stream = chan
@@ -137,13 +149,32 @@ class Binance(Feed, BinanceRestMixin):
             return {chunk[0]: address + '/'.join(chunk) for chunk in split_list(subs, 200)}
 
     def _reset(self):
-        self.forced = defaultdict(bool)
         self._l2_book = {}
         self.last_update_id = {}
 
         if self.concurrent_http:
             # buffer 'depthUpdate' book msgs until snapshot is fetched
             self._book_buffer: Dict[str, deque[Tuple[dict, str, float]]] = {}
+
+    async def _refresh_token(self):
+        while True:
+            await sleep(30 * 60)
+            if self.token is None:
+                raise ValueError('There is no token to refresh')
+            payload = {'listenKey': self.token}
+            r = requests.put(f'{self.api}{self.listen_key_endpoint}?{urlencode(payload)}', headers={'X-MBX-APIKEY': self.key_id})
+            r.raise_for_status()
+
+    def _generate_token(self) -> str:
+        url = f'{self.api}{self.listen_key_endpoint}'
+        r = requests.post(url, headers={'X-MBX-APIKEY': self.key_id})
+        r.raise_for_status()
+        response = r.json()
+        if 'listenKey' in response:
+            self.token = response['listenKey']
+            return self.token
+        else:
+            raise ValueError(f'Unable to retrieve listenKey token from {url}')
 
     async def _trade(self, msg: dict, timestamp: float):
         """
@@ -227,28 +258,23 @@ class Binance(Feed, BinanceRestMixin):
                           raw=msg)
         await self.callback(LIQUIDATIONS, liq, receipt_timestamp=timestamp)
 
-    def _check_update_id(self, std_pair: str, msg: dict) -> Tuple[bool, bool, bool]:
+    def _check_update_id(self, std_pair: str, msg: dict) -> bool:
         """
-        'current_match' is True if the msg's update_id matches snapshot's update_id in self.last_update_id.
-        Messages will be queued (or buffered if concurrent_http is True) while fetching for snapshot, and we can return a book_callback using this msg's data instead of waiting for the next update.
+        Messages will be queued (or buffered if concurrent_http is True) while fetching for snapshot
+        and we can return a book_callback using this msg's data instead of waiting for the next update.
         """
-        skip_update = False
-        forced = not self.forced[std_pair]
-        current_match = msg['u'] == self.last_update_id[std_pair]
-
-        if forced and msg['u'] <= self.last_update_id[std_pair]:
-            skip_update = True
-        elif forced and msg['U'] <= self.last_update_id[std_pair] + 1 <= msg['u']:
+        if self._l2_book[std_pair].delta is None and msg['u'] <= self.last_update_id[std_pair]:
+            return True
+        elif msg['U'] <= self.last_update_id[std_pair] + 1 <= msg['u']:
             self.last_update_id[std_pair] = msg['u']
-            self.forced[std_pair] = True
-        elif not forced and self.last_update_id[std_pair] + 1 == msg['U']:
+            return False
+        elif self.last_update_id[std_pair] + 1 == msg['U']:
             self.last_update_id[std_pair] = msg['u']
+            return False
         else:
             self._reset()
             LOG.warning("%s: Missing book update detected, resetting book", self.id)
-            skip_update = True
-
-        return skip_update, current_match
+            return True
 
     async def _snapshot(self, pair: str) -> None:
         max_depth = self.max_depth if self.max_depth else self.valid_depths[-1]
@@ -265,19 +291,15 @@ class Binance(Feed, BinanceRestMixin):
         std_pair = self.exchange_symbol_to_std_symbol(pair)
         self.last_update_id[std_pair] = resp['lastUpdateId']
         self._l2_book[std_pair] = OrderBook(self.id, std_pair, max_depth=self.max_depth, bids={Decimal(u[0]): Decimal(u[1]) for u in resp['bids']}, asks={Decimal(u[0]): Decimal(u[1]) for u in resp['asks']})
-        self._l2_book[std_pair].sequence_number = resp['lastUpdateId']
-        self._l2_book[std_pair].raw = resp
+        ts = self.timestamp_normalize(resp['E']) if 'E' in resp else None
+        await self.book_callback(L2_BOOK, self._l2_book[std_pair], time.time(), raw=resp, timestamp=ts, sequence_number=resp['lastUpdateId'])
 
     async def _handle_book_msg(self, msg: dict, pair: str, timestamp: float):
         """
         Processes 'depthUpdate' update book msg. This method should only be called if pair's l2_book exists.
         """
         std_pair = self.exchange_symbol_to_std_symbol(pair)
-        skip_update, current_match = self._check_update_id(std_pair, msg)
-        if current_match:
-            # Current msg.final_update_id == self.last_update_id[pair] which is the snapshot's update id
-            return await self.book_callback(L2_BOOK, self._l2_book[std_pair], timestamp, raw=msg, sequence_number=self.last_update_id[std_pair], timestamp=self.timestamp_normalize(msg['E']))
-
+        skip_update = self._check_update_id(std_pair, msg)
         if skip_update:
             return
 
@@ -360,13 +382,26 @@ class Binance(Feed, BinanceRestMixin):
             "r": "0.00030000",       // Funding rate
             "T": 1562306400000       // Next funding time
         }
+
+        BinanceFutures
+        {
+            "e": "markPriceUpdate",     // Event type
+            "E": 1562305380000,         // Event time
+            "s": "BTCUSDT",             // Symbol
+            "p": "11185.87786614",      // Mark price
+            "i": "11784.62659091"       // Index price
+            "P": "11784.25641265",      // Estimated Settle Price, only useful in the last hour before the settlement starts
+            "r": "0.00030000",          // Funding rate
+            "T": 1562306400000          // Next funding time
+        }
         """
         f = Funding(self.id,
                     self.exchange_symbol_to_std_symbol(msg['s']),
-                    msg['p'],
-                    msg['r'],
+                    Decimal(msg['p']),
+                    Decimal(msg['r']),
                     self.timestamp_normalize(msg['T']),
                     self.timestamp_normalize(msg['E']),
+                    predicted_rate=Decimal(msg['P']) if 'P' in msg and msg['P'] is not None else None,
                     raw=msg)
         await self.callback(FUNDING, f, timestamp)
 
@@ -415,9 +450,38 @@ class Binance(Feed, BinanceRestMixin):
                    raw=msg)
         await self.callback(CANDLES, c, timestamp)
 
+    async def _account_update(self, msg: dict, timestamp: float):
+        """
+        {
+            "e": "outboundAccountPosition", //Event type
+            "E": 1564034571105,             //Event Time
+            "u": 1564034571073,             //Time of last account update
+            "B": [                          //Balances Array
+                {
+                "a": "ETH",                 //Asset
+                "f": "10000.000000",        //Free
+                "l": "0.000000"             //Locked
+                }
+            ]
+        }
+        """
+        for balance in msg['B']:
+            await self.callback(BALANCES,
+                                feed=self.id,
+                                symbol=balance['a'],
+                                timestamp=self.timestamp_normalize(msg['E']),
+                                receipt_timestamp=timestamp,
+                                wallet_balance=Decimal(balance['f']))
+
     async def message_handler(self, msg: str, conn, timestamp: float):
         msg = json.loads(msg, parse_float=Decimal)
 
+        # Handle account updates from User Data Stream
+        if self.requires_authentication:
+            msg_type = msg['e']
+            if msg_type == 'outboundAccountPosition':
+                await self._account_update(msg, timestamp)
+            return
         # Combined stream events are wrapped as follows: {"stream":"<streamName>","data":<rawPayload>}
         # streamName is of format <symbol>@<channel>
         pair, _ = msg['stream'].split('@', 1)
@@ -449,3 +513,5 @@ class Binance(Feed, BinanceRestMixin):
             self._open_interest_cache = {}
         else:
             self._reset()
+        if self.requires_authentication:
+            create_task(self._refresh_token())

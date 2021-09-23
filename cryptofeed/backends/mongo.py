@@ -2,10 +2,10 @@
 '''
 Copyright (C) 2017-2021  Bryant Moscon - bmoscon@gmail.com
 '''
+from collections import defaultdict
 
 import bson
 import motor.motor_tornado
-
 
 from cryptofeed.backends.backend import BackendBookCallback, BackendCallback
 
