@@ -167,7 +167,7 @@ class FTX(Feed):
         """
         for trade in msg['data']:
             await self.callback(TRADES,
-                                symbol=symbol_exchange_to_std(msg['market']).replace('-','_',1),
+                                symbol=symbol_exchange_to_std(msg['market']).replace('-','_'),
                                 side=BUY if trade['side'] == 'buy' else SELL,
                                 amount=Decimal(trade['size']),
                                 price=Decimal(trade['price']),
@@ -176,7 +176,7 @@ class FTX(Feed):
                                 receipt_timestamp=timestamp)
             if bool(trade['liquidation']):
                 await self.callback(LIQUIDATIONS,
-                                    symbol=symbol_exchange_to_std(msg['market']).replace('-','_',1),
+                                    symbol=symbol_exchange_to_std(msg['market']).replace('-','_'),
                                     side=BUY if trade['side'] == 'buy' else SELL,
                                     leaves_qty=Decimal(trade['size']),
                                     price=Decimal(trade['price']),
@@ -193,7 +193,7 @@ class FTX(Feed):
         "last": 10719.0, "time": 1564834587.1299787}}
         """
         await self.callback(TICKER, 
-                            symbol=symbol_exchange_to_std(msg['market']).replace('-','_',1),
+                            symbol=symbol_exchange_to_std(msg['market']).replace('-','_'),
                             bid=Decimal(msg['data']['bid'] if msg['data']['bid'] else 0.0),
                             ask=Decimal(msg['data']['ask'] if msg['data']['ask'] else 0.0),
                             timestamp=float(msg['data']['time']),
@@ -216,7 +216,7 @@ class FTX(Feed):
         check = msg['data']['checksum']
         if msg['type'] == 'partial':
             # snapshot
-            pair = symbol_exchange_to_std(msg['market']).replace('-','_',1)
+            pair = symbol_exchange_to_std(msg['market']).replace('-','_')
             self.l2_book[pair] = {
                 BID: sd({
                     Decimal(price): Decimal(amount) for price, amount in msg['data']['bids']
@@ -231,7 +231,7 @@ class FTX(Feed):
         else:
             # update
             delta = {BID: [], ASK: []}
-            pair = symbol_exchange_to_std(msg['market']).replace('-','_',1)
+            pair = symbol_exchange_to_std(msg['market']).replace('-','_')
             for side in ('bids', 'asks'):
                 s = BID if side == 'bids' else ASK
                 for price, amount in msg['data'][side]:

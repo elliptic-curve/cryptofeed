@@ -88,7 +88,7 @@ class Binance(Feed):
         amount = Decimal(msg['q'])
         await self.callback(TRADES,
                             order_id=msg['a'],
-                            symbol=symbol_exchange_to_std(msg['s']).replace('-','_',1),
+                            symbol=symbol_exchange_to_std(msg['s']).replace('-','_'),
                             side=SELL if msg['m'] else BUY,
                             amount=amount,
                             price=price,
@@ -127,7 +127,7 @@ class Binance(Feed):
         bid = Decimal(msg['b'])
         ask = Decimal(msg['a'])
         await self.callback(TICKER,
-                            symbol=pair.replace('-','_',1),
+                            symbol=pair.replace('-','_'),
                             bid=bid,
                             ask=ask,
                             timestamp=timestamp_normalize(self.id, msg['E']),
