@@ -9,9 +9,10 @@ import logging
 
 import json
 
-from cryptofeed.defines import BALANCES, BINANCE_DELIVERY, FUNDING, LIQUIDATIONS, OPEN_INTEREST, POSITIONS
+from cryptofeed.defines import BALANCES, BINANCE_DELIVERY, BUY, FUNDING, LIMIT, LIQUIDATIONS, MARKET, OPEN_INTEREST, ORDER_INFO, POSITIONS, SELL
 from cryptofeed.exchanges.binance import Binance
 from cryptofeed.exchanges.mixins.binance_rest import BinanceDeliveryRestMixin
+from cryptofeed.types import Balance, OrderInfo, Position
 
 
 LOG = logging.getLogger('feedhandler')
@@ -111,21 +112,85 @@ class BinanceDelivery(Binance, BinanceDeliveryRestMixin):
         }
         """
         for balance in msg['a']['B']:
-            await self.callback(BALANCES,
-                                feed=self.id,
-                                symbol=balance['a'],
-                                timestamp=self.timestamp_normalize(msg['E']),
-                                receipt_timestamp=timestamp,
-                                wallet_balance=Decimal(balance['wb']))
+            b = Balance(
+                self.id,
+                balance['a'],
+                Decimal(balance['wb']),
+                None,
+                raw=msg)
+            await self.callback(BALANCES, b, timestamp)
         for position in msg['a']['P']:
-            await self.callback(POSITIONS,
-                                feed=self.id,
-                                symbol=self.exchange_symbol_to_std_symbol(position['s']),
-                                timestamp=self.timestamp_normalize(msg['E']),
-                                receipt_timestamp=timestamp,
-                                position_amount=Decimal(position['pa']),
-                                entry_price=Decimal(position['ep']),
-                                unrealised_pnl=Decimal(position['up']))
+            p = Position(
+                self.id,
+                self.exchange_symbol_to_std_symbol(position['s']),
+                Decimal(position['pa']),
+                Decimal(position['ep']),
+                Decimal(position['up']),
+                self.timestamp_normalize(msg['E']),
+                raw=msg)
+            await self.callback(POSITIONS, p, timestamp)
+
+    async def _order_update(self, msg: dict, timestamp: float):
+        """
+        {
+            "e":"ORDER_TRADE_UPDATE",     // Event Type
+            "E":1591274595442,            // Event Time
+            "T":1591274595453,            // Transaction Time
+            "i":"SfsR",                   // Account Alias
+            "o":
+            {
+                "s":"BTCUSD_200925",        // Symbol
+                "c":"TEST",                 // Client Order Id
+                // special client order id:
+                // starts with "autoclose-": liquidation order
+                // "adl_autoclose": ADL auto close order
+                "S":"SELL",                 // Side
+                "o":"TRAILING_STOP_MARKET", // Order Type
+                "f":"GTC",                  // Time in Force
+                "q":"2",                    // Original Quantity
+                "p":"0",                    // Original Price
+                "ap":"0",                   // Average Price
+                "sp":"9103.1",              // Stop Price. Please ignore with TRAILING_STOP_MARKET order
+                "x":"NEW",                  // Execution Type
+                "X":"NEW",                  // Order Status
+                "i":8888888,                // Order Id
+                "l":"0",                    // Order Last Filled Quantity
+                "z":"0",                    // Order Filled Accumulated Quantity
+                "L":"0",                    // Last Filled Price
+                "ma": "BTC",                // Margin Asset
+                "N":"BTC",                  // Commission Asset of the trade, will not push if no commission
+                "n":"0",                    // Commission of the trade, will not push if no commission
+                "T":1591274595442,          // Order Trade Time
+                "t":0,                      // Trade Id
+                "rp": "0",                  // Realized Profit of the trade
+                "b":"0",                    // Bid quantity of base asset
+                "a":"0",                    // Ask quantity of base asset
+                "m":false,                  // Is this trade the maker side?
+                "R":false,                  // Is this reduce only
+                "wt":"CONTRACT_PRICE",      // Stop Price Working Type
+                "ot":"TRAILING_STOP_MARKET",// Original Order Type
+                "ps":"LONG",                // Position Side
+                "cp":false,                 // If Close-All, pushed with conditional order
+                "AP":"9476.8",              // Activation Price, only puhed with TRAILING_STOP_MARKET order
+                "cr":"5.0",                 // Callback Rate, only puhed with TRAILING_STOP_MARKET order
+                "pP": false                 // If conditional order trigger is protected
+            }
+        }
+        """
+        oi = OrderInfo(
+            self.id,
+            self.exchange_symbol_to_std_symbol(msg['o']['s']),
+            str(msg['o']['i']),
+            BUY if msg['o']['S'].lower() == 'buy' else SELL,
+            msg['o']['x'],
+            LIMIT if msg['o']['o'].lower() == 'limit' else MARKET if msg['o']['o'].lower() == 'market' else None,
+            Decimal(msg['o']['ap']) if not Decimal.is_zero(Decimal(msg['o']['ap'])) else None,
+            Decimal(msg['o']['q']),
+            Decimal(msg['o']['q']) - Decimal(msg['o']['z']),
+            self.timestamp_normalize(msg['E']),
+            raw=msg
+        )
+        await self.callback(ORDER_INFO, oi, timestamp)
 
     async def message_handler(self, msg: str, conn, timestamp: float):
         msg = json.loads(msg, parse_float=Decimal)
@@ -135,6 +200,8 @@ class BinanceDelivery(Binance, BinanceDeliveryRestMixin):
             msg_type = msg.get('e')
             if msg_type == 'ACCOUNT_UPDATE':
                 await self._account_update(msg, timestamp)
+            elif msg_type == 'ORDER_TRADE_UPDATE':
+                await self._order_update(msg, timestamp)
             return
         # Combined stream events are wrapped as follows: {"stream":"<streamName>","data":<rawPayload>}
         # streamName is of format <symbol>@<channel>

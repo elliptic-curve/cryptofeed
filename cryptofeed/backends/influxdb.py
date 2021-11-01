@@ -13,7 +13,6 @@ from cryptofeed.backends.backend import BackendBookCallback, BackendCallback
 from cryptofeed.backends.http import HTTPCallback
 from cryptofeed.defines import BID, ASK
 
-
 LOG = logging.getLogger('feedhandler')
 
 
@@ -61,6 +60,7 @@ class InfluxCallback(HTTPCallback):
         self.session = None
         self.key = key if key else self.default_key
         self.numeric_type = float
+        self.none_to = None
 
     def format(self, data):
         ret = []
@@ -75,7 +75,9 @@ class InfluxCallback(HTTPCallback):
 
     async def write(self, data):
         d = self.format(data)
-        update = f'{self.key}-{data["exchange"]},symbol={data["symbol"]} {d},timestamp={data["timestmap"]},receipt_timestamp={data["receipt_timestamp"]} {int(data["receipt_timestamp"] * 1000000)}'
+        timestamp = data["timestamp"]
+        timestamp_str = f',timestamp={timestamp}' if timestamp is not None else ''
+        update = f'{self.key}-{data["exchange"]},symbol={data["symbol"]} {d}{timestamp_str},receipt_timestamp={data["receipt_timestamp"]} {int(data["receipt_timestamp"] * 1000000)}'
         await self.queue.put({'data': update, 'headers': self.headers})
 
 

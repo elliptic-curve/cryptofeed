@@ -89,7 +89,7 @@ class FTX(Feed, FTXRestMixin):
         return ret, info
 
     def __init__(self, **kwargs):
-        super().__init__('wss://ftexchange.com/ws/', **kwargs)
+        super().__init__('wss://ftx.com/ws/', **kwargs)
         self.ws_defaults['compression'] = None
 
     def __reset(self):
@@ -399,7 +399,7 @@ class FTX(Feed, FTXRestMixin):
             BUY if order['side'].lower() == 'buy' else SELL,
             status,
             LIMIT if order['type'] == 'limit' else MARKET,
-            Decimal(order['price']),
+            Decimal(order['price']) if order['price'] else None,
             Decimal(order['filledSize']),
             Decimal(order['remainingSize']),
             None,

@@ -4,18 +4,17 @@ Copyright (C) 2017-2021  Bryant Moscon - bmoscon@gmail.com
 Please see the LICENSE file for the terms and conditions
 associated with this software.
 '''
-from asyncio import create_task
 from decimal import Decimal
 import logging
 from typing import List, Tuple, Callable, Dict
 
 import json
 
-from cryptofeed.connection import AsyncConnection, HTTPPoll, HTTPConcurrentPoll
-from cryptofeed.defines import BALANCES, BINANCE_FUTURES, FUNDING, LIQUIDATIONS, OPEN_INTEREST, POSITIONS
+from cryptofeed.connection import AsyncConnection, HTTPPoll
+from cryptofeed.defines import BALANCES, BINANCE_FUTURES, BUY, FUNDING, LIMIT, LIQUIDATIONS, MARKET, OPEN_INTEREST, ORDER_INFO, POSITIONS, SELL
 from cryptofeed.exchanges.binance import Binance
 from cryptofeed.exchanges.mixins.binance_rest import BinanceFuturesRestMixin
-from cryptofeed.types import OpenInterest
+from cryptofeed.types import Balance, OpenInterest, OrderInfo, Position
 
 LOG = logging.getLogger('feedhandler')
 
@@ -98,7 +97,7 @@ class BinanceFutures(Binance, BinanceFuturesRestMixin):
         ret = []
         if self.address:
             ret = super().connect()
-        PollCls = HTTPConcurrentPoll if self.concurrent_http else HTTPPoll
+        PollCls = HTTPPoll
         for chan in set(self.subscription):
             if chan == 'open_interest':
                 addrs = [f"{self.rest_endpoint}/openInterest?symbol={pair}" for pair in self.subscription[chan]]
@@ -164,37 +163,97 @@ class BinanceFutures(Binance, BinanceFuturesRestMixin):
         }
         """
         for balance in msg['a']['B']:
-            await self.callback(BALANCES,
-                                feed=self.id,
-                                symbol=balance['a'],
-                                timestamp=self.timestamp_normalize(msg['E']),
-                                receipt_timestamp=timestamp,
-                                wallet_balance=Decimal(balance['wb']))
+            b = Balance(
+                self.id,
+                balance['a'],
+                Decimal(balance['wb']),
+                None,
+                raw=msg)
+            await self.callback(BALANCES, b, timestamp)
         for position in msg['a']['P']:
-            await self.callback(POSITIONS,
-                                feed=self.id,
-                                symbol=self.exchange_symbol_to_std_symbol(position['s']),
-                                timestamp=self.timestamp_normalize(msg['E']),
-                                receipt_timestamp=timestamp,
-                                position_amount=Decimal(position['pa']),
-                                entry_price=Decimal(position['ep']),
-                                unrealised_pnl=Decimal(position['up']))
+            p = Position(
+                self.id,
+                self.exchange_symbol_to_std_symbol(position['s']),
+                Decimal(position['pa']),
+                Decimal(position['ep']),
+                Decimal(position['up']),
+                self.timestamp_normalize(msg['E']),
+                raw=msg)
+            await self.callback(POSITIONS, p, timestamp)
+
+    async def _order_update(self, msg: dict, timestamp: float):
+        """
+        {
+            "e":"ORDER_TRADE_UPDATE",     // Event Type
+            "E":1568879465651,            // Event Time
+            "T":1568879465650,            // Transaction Time
+            "o":
+            {
+                "s":"BTCUSDT",              // Symbol
+                "c":"TEST",                 // Client Order Id
+                // special client order id:
+                // starts with "autoclose-": liquidation order
+                // "adl_autoclose": ADL auto close order
+                "S":"SELL",                 // Side
+                "o":"TRAILING_STOP_MARKET", // Order Type
+                "f":"GTC",                  // Time in Force
+                "q":"0.001",                // Original Quantity
+                "p":"0",                    // Original Price
+                "ap":"0",                   // Average Price
+                "sp":"7103.04",             // Stop Price. Please ignore with TRAILING_STOP_MARKET order
+                "x":"NEW",                  // Execution Type
+                "X":"NEW",                  // Order Status
+                "i":8886774,                // Order Id
+                "l":"0",                    // Order Last Filled Quantity
+                "z":"0",                    // Order Filled Accumulated Quantity
+                "L":"0",                    // Last Filled Price
+                "N":"USDT",             // Commission Asset, will not push if no commission
+                "n":"0",                // Commission, will not push if no commission
+                "T":1568879465651,          // Order Trade Time
+                "t":0,                      // Trade Id
+                "b":"0",                    // Bids Notional
+                "a":"9.91",                 // Ask Notional
+                "m":false,                  // Is this trade the maker side?
+                "R":false,                  // Is this reduce only
+                "wt":"CONTRACT_PRICE",      // Stop Price Working Type
+                "ot":"TRAILING_STOP_MARKET",    // Original Order Type
+                "ps":"LONG",                        // Position Side
+                "cp":false,                     // If Close-All, pushed with conditional order
+                "AP":"7476.89",             // Activation Price, only puhed with TRAILING_STOP_MARKET order
+                "cr":"5.0",                 // Callback Rate, only puhed with TRAILING_STOP_MARKET order
+                "rp":"0"                            // Realized Profit of the trade
+            }
+        }
+        """
+        oi = OrderInfo(
+            self.id,
+            self.exchange_symbol_to_std_symbol(msg['o']['s']),
+            str(msg['o']['i']),
+            BUY if msg['o']['S'].lower() == 'buy' else SELL,
+            msg['o']['x'],
+            LIMIT if msg['o']['o'].lower() == 'limit' else MARKET if msg['o']['o'].lower() == 'market' else None,
+            Decimal(msg['o']['ap']) if not Decimal.is_zero(Decimal(msg['o']['ap'])) else None,
+            Decimal(msg['o']['q']),
+            Decimal(msg['o']['q']) - Decimal(msg['o']['z']),
+            self.timestamp_normalize(msg['E']),
+            raw=msg
+        )
+        await self.callback(ORDER_INFO, oi, timestamp)
 
     async def message_handler(self, msg: str, conn: AsyncConnection, timestamp: float):
         msg = json.loads(msg, parse_float=Decimal)
 
         # Handle REST endpoint messages first
         if 'openInterest' in msg:
-            coro = self._open_interest(msg, timestamp)
-            if self.concurrent_http:
-                return create_task(coro)
-            return await coro
+            return await self._open_interest(msg, timestamp)
 
         # Handle account updates from User Data Stream
         if self.requires_authentication:
             msg_type = msg.get('e')
             if msg_type == 'ACCOUNT_UPDATE':
                 await self._account_update(msg, timestamp)
+            elif msg_type == 'ORDER_TRADE_UPDATE':
+                await self._order_update(msg, timestamp)
             return
 
         # Combined stream events are wrapped as follows: {"stream":"<streamName>","data":<rawPayload>}

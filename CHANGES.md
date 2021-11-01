@@ -1,5 +1,47 @@
 ## Changelog
 
+### 2.1.0
+ * Bugfix: Update binance user data streams to use cdef types.
+ * Feature: Add none_to kwarg to to_dict method of data type objects. Allows replacmen of Nones with specified value.
+ * Bugfix: Some redis backends were trying to write Nones to storage and failing.
+ * Uodate: Renamed as_type kwarg on to_dict to numeric_type.
+ * Bugfix: Some dYdX symbols were incorrectly classified as spot.
+ * Update: Drop support for Python 3.7.
+ * Bugfix: Orderbooks need to be truncated to the correct depth when max depth is smaller than the maximum on Kraken.
+
+### 2.0.3 (2021-10-26)
+ * Bugfix: Use timestamp_e6 for data derived from Bybit's instrument_info data feed.
+ * Bugfix: Update postgres examples and schema. Fix postgres backend for all dtypes.
+ * Bugfix: Kucoin has a limit of 100 symbols per subscription message and 300 per connection. These limits are now respected.
+ * Bugfix: Error messages were not handled correctly on Kucoin, causing a crash.
+ * Bugfix: FTX websocket endpoint update.
+ * Bugfix: Fix the address used for authenticated Binance streams.
+ * Bugfix: Handle cases where Bitmex book data is empty.
+
+### 2.0.2 (2021-10-12)
+ * Feature: random backoff when 429s are hit
+ * Bugfix: Add rate limiting delay to snapshot querying on Binance
+ * Update: Write deltas then snapshot when book interval is hit on Book Backends
+ * Feature: Bybit liquidation support
+ * Feature: Add support for Binance websocket orders stream
+ * Bugfix: typo in influxDB backend
+ * Bugfix: typo in optional type checking in cython module
+ * Feature: compile cython code (and toggle optional assertions) correctly on windows
+ * Feature: Allow logging disable via config option
+ * Feature: Remove add_feed_running() method, add_feed can be used to add exchange feeds to running feedhandler.
+ * Bugfix: Allow empty feedhandler to be started
+ * Bugfix: Funding missing type conversion for to_dict method.
+ * Bugfix: RedisStream candles boolean not being converted properly
+ * Bugfix: FTX order info not handling price of None correctly on reduce only updates
+ * Bugfix: Fills using incorrect order id
+ * Feature: Periodically refresh order books in Binance to reduce the likelihood of order levels becoming stale
+ * Update: Bitcoin.com exchange migrated to FMFW.io and API was updated
+ * Revert: Temporarily revert the concurrent http changes in Binance as well as the snapshot refresh code while bugs are resolved
+ * Bugfix: Fix Throttle callback, added an example to illustrate usage
+ * Bugfix: BinanceFutures and BinanceDelivery not handling rates and funding times of 0/null for futures contracts
+ * Bugfix: Open Interest in Bitmex not being converted to decimal
+ * Update: Renamed field quantity in Liquidation data type
+
 ### 2.0.1 (2021-09-22)
  * Bugfix: BinanceDelivery and BinanceFutures WS compression
  * Bugfix: Upbit REST candles do not work when start/end are not specified
