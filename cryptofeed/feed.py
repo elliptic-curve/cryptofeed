@@ -18,7 +18,6 @@ from cryptofeed.connection_handler import ConnectionHandler
 from cryptofeed.defines import BALANCES, CANDLES, FUNDING, INDEX, L2_BOOK, L3_BOOK, LIQUIDATIONS, OPEN_INTEREST, ORDER_INFO, POSITIONS, TICKER, TRADES, FILLS
 from cryptofeed.exceptions import BidAskOverlapping
 from cryptofeed.exchange import Exchange
-from cryptofeed.types import OrderBook
 
 import pyximport
 pyximport.install()

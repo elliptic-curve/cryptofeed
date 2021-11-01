@@ -9,7 +9,7 @@ from decimal import Decimal
 import logging
 from typing import Dict, Tuple
 
-from yapic import json
+import json
 
 from cryptofeed.defines import ASK, BID, BUY, CANDLES, FMFW as FMFW_id, L2_BOOK, SELL, TICKER, TRADES
 from cryptofeed.exceptions import MissingSequenceNumber
