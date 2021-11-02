@@ -45,7 +45,7 @@ class TradeMongo(MongoCallback, BackendCallback):
         d = {'_id': data['timestamp'], 'receipt_timestamp': data['receipt_timestamp'], 'size': data['amount'], 'price': data['price'], 'side': True if data['side'] == "sell" else False}
         if 'tick_direction' in data.keys() and data['side'] != data['tick_direction']:
             d['tick_direction'] = data['tick_direction'], 
-        await self.db[data['symbol'] + '_' + self.collection].update_one(loc, {'$set': d}, upsert = True)
+        await self.db[data['symbol'].replace("-","_") + '_' + self.collection].update_one(loc, {'$set': d}, upsert = True)
 
 
 class FundingMongo(MongoCallback, BackendCallback):
@@ -127,7 +127,7 @@ class TickerMongo(MongoCallback, BackendCallback):
             'mid_price': (float(data['bid']) + float(data['ask'])) / 2
         }
 
-        await self.db[data['symbol']+ '_' + self.collection].update_one(loc, {'$set': d}, upsert =True)
+        await self.db[data['symbol'].replace("-","_")+ '_' + self.collection].update_one(loc, {'$set': d}, upsert =True)
 
 
 class OpenInterestMongo(MongoCallback, BackendCallback):
