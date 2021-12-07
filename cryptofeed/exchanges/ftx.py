@@ -33,6 +33,7 @@ LOG = logging.getLogger('feedhandler')
 class FTX(Feed, FTXRestMixin):
     id = FTX_id
     symbol_endpoint = "https://ftx.com/api/markets"
+    websocket_endpoint = 'wss://ftx.com/ws/'
     websocket_channels = {
         L2_BOOK: 'orderbook',
         TRADES: 'trades',
@@ -89,7 +90,7 @@ class FTX(Feed, FTXRestMixin):
         return ret, info
 
     def __init__(self, **kwargs):
-        super().__init__('wss://ftx.com/ws/', **kwargs)
+        super().__init__(**kwargs)
         self.ws_defaults['compression'] = None
 
     def __reset(self):
@@ -355,6 +356,7 @@ class FTX(Feed, FTXRestMixin):
             None,
             TAKER if fill['liquidity'] == 'taker' else MAKER,
             fill['time'].timestamp(),
+            account=self.subaccount,
             raw=msg
         )
         await self.callback(FILLS, f, timestamp)
@@ -403,6 +405,7 @@ class FTX(Feed, FTXRestMixin):
             Decimal(order['filledSize']),
             Decimal(order['remainingSize']),
             None,
+            account=self.subaccount,
             raw=msg
         )
         await self.callback(ORDER_INFO, oi, timestamp)

@@ -28,6 +28,16 @@ LOG = logging.getLogger('feedhandler')
 class Bybit(Feed):
     id = BYBIT
     symbol_endpoint = 'https://api.bybit.com/v2/public/symbols'
+    websocket_endpoint = {
+        'USD': 'wss://stream.bybit.com/realtime',
+        'USDT': 'wss://stream.bybit.com/realtime_public',
+        'USDTP': 'wss://stream.bybit.com/realtime_private'
+    }
+    sandbox_endpoint = {
+        'USD': 'wss://stream-testnet.bybit.com/realtime',
+        'USDT': 'wss://stream-testnet.bybit.com/realtime_public',
+        'USDTP': 'wss://stream-testnet.bybit.com/realtime_private'
+    }
     websocket_channels = {
         L2_BOOK: 'orderBook_200.100ms',
         TRADES: 'trade',
@@ -41,6 +51,7 @@ class Bybit(Feed):
         # BALANCES: 'position' removing temporarily, this is a position, not a balance
     }
     valid_candle_intervals = {'1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '1d', '1w', '1M'}
+    candle_interval_map = {'1m': '1', '3m': '3', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '2h': '120', '4h': '240', '6h': '360', '1d': 'D', '1w': 'W', '1M': 'M'}
 
     @classmethod
     def timestamp_normalize(cls, ts: Union[int, dt]) -> float:
@@ -75,9 +86,8 @@ class Bybit(Feed):
         return ret, info
 
     def __init__(self, **kwargs):
-        super().__init__({'USD': 'wss://stream.bybit.com/realtime', 'USDT': 'wss://stream.bybit.com/realtime_public', 'USDTP': 'wss://stream.bybit.com/realtime_private'}, **kwargs)
+        super().__init__(**kwargs)
         self.ws_defaults['compression'] = None
-        self.candle_mapping = {'1m': '1', '3m': '3', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '2h': '120', '4h': '240', '6h': '360', '1d': 'D', '1w': 'W', '1M': 'M'}
 
     def __reset(self, quote=None):
         self._instrument_info_cache = {}
@@ -233,7 +243,7 @@ class Bybit(Feed):
                     await connection.write(json.dumps(
                         {
                             "op": "subscribe",
-                            "args": [f"{chan}.{pair}"] if self.exchange_channel_to_std(chan) != CANDLES else [f"{chan if quote == 'USD' else 'candle'}.{self.candle_mapping[self.candle_interval]}.{pair}"]
+                            "args": [f"{chan}.{pair}"] if self.exchange_channel_to_std(chan) != CANDLES else [f"{chan if quote == 'USD' else 'candle'}.{self.candle_interval_map[self.candle_interval]}.{pair}"]
                         }
                     ))
                     LOG.debug(f'{connection.uuid}: Subscribing to public, quote: {quote}, {chan}.{pair}')
@@ -475,14 +485,14 @@ class Bybit(Feed):
                 self.id,
                 self.exchange_symbol_to_std_symbol(data['symbol']),
                 data["order_id"],
-                BUY if msg["side"] == 'Buy' else SELL,
+                BUY if data["side"] == 'Buy' else SELL,
                 order_status[data["order_status"]],
                 LIMIT if data['order_type'] == 'Limit' else MARKET,
                 Decimal(data['price']),
-                Decimal(data['cumQuantity']),
-                Decimal(data['qty']) - Decimal(data['cumQuantity']),
-                self.timestamp_normalize(data["updateTime"]),
-                raw=data
+                Decimal(data['cum_exec_qty']),
+                Decimal(data['qty']) - Decimal(data['cum_exec_qty']),
+                self.timestamp_normalize(data.get('update_time') or data.get('O') or data.get('timestamp')),
+                raw=data,
             )
             await self.callback(ORDER_INFO, oi, timestamp)
 

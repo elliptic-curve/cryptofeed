@@ -10,6 +10,8 @@ from cryptofeed import FeedHandler
 from cryptofeed.defines import CANDLES, BID, ASK, BLOCKCHAIN, FUNDING, GEMINI, L2_BOOK, L3_BOOK, LIQUIDATIONS, OPEN_INTEREST, PERPETUAL, TICKER, TRADES, INDEX
 from cryptofeed.exchanges import (FTX, Binance, BinanceUS, BinanceFutures, Bitfinex, Bitflyer, AscendEX, Bitmex, Bitstamp, Bittrex, Coinbase, Gateio,
                                   HitBTC, Huobi, HuobiDM, HuobiSwap, Kraken, OKCoin, OKEx, Poloniex, Bybit, KuCoin, Bequant, Upbit, Probit)
+from cryptofeed.exchanges.cryptodotcom import CryptoDotCom
+from cryptofeed.exchanges.delta import Delta
 from cryptofeed.exchanges.fmfw import FMFW
 from cryptofeed.exchanges.kraken_futures import KrakenFutures
 from cryptofeed.exchanges.blockchain import Blockchain
@@ -82,7 +84,7 @@ def main():
     pairs = Binance.symbols()[:1]
     f.add_feed(Binance(symbols=pairs, channels=[L2_BOOK], callbacks={L2_BOOK: book, CANDLES: candle_callback, TRADES: trade, TICKER: ticker}))
     pairs = BinanceFutures.symbols()[:30]
-    f.add_feed(BinanceFutures(symbols=pairs, channels=[OPEN_INTEREST, FUNDING, LIQUIDATIONS], callbacks={OPEN_INTEREST: oi, FUNDING: funding, LIQUIDATIONS: liquidations}))
+    f.add_feed(BinanceFutures(symbols=pairs, channels=[TRADES, OPEN_INTEREST, FUNDING, LIQUIDATIONS], callbacks={TRADES: trade, OPEN_INTEREST: oi, FUNDING: funding, LIQUIDATIONS: liquidations}))
     f.add_feed(BinanceUS(symbols=BinanceUS.symbols()[:2], channels=[TRADES, L2_BOOK], callbacks={L2_BOOK: book, TRADES: trade}))
     f.add_feed(Bitfinex(symbols=['BTC-USDT'], channels=[L3_BOOK], callbacks={L3_BOOK: book, TICKER: ticker, TRADES: trade}))
     f.add_feed(Bitflyer(symbols=['BTC-JPY'], channels=[TICKER, TRADES, L2_BOOK], callbacks={L2_BOOK: book, TICKER: ticker, TRADES: trade}))
@@ -115,7 +117,8 @@ def main():
     f.add_feed(Poloniex(subscription={TRADES: ['DOGE-BTC'], L2_BOOK: ['LTC-BTC']}, callbacks={TRADES: trade, L2_BOOK: book}))
     f.add_feed(Probit(subscription={TRADES: ['BTC-USDT'], L2_BOOK: ['BTC-USDT']}, callbacks={TRADES: trade, L2_BOOK: book}))
     f.add_feed(Upbit(subscription={TRADES: ['BTC-USDT'], L2_BOOK: ['BTC-USDT']}, callbacks={TRADES: trade, L2_BOOK: book}))
-
+    f.add_feed(CryptoDotCom(symbols=['BTC-USDT'], channels=[L2_BOOK, TICKER, CANDLES, TRADES], callbacks={TRADES: trade, CANDLES: candle_callback, TICKER: ticker, L2_BOOK: book}))
+    f.add_feed(Delta(symbols=['BTC-USDT', 'BTC-USDT-PERP'], channels=[L2_BOOK, TRADES, CANDLES], callbacks={TRADES: trade, CANDLES: candle_callback, L2_BOOK: book}))
     f.run()
 
 

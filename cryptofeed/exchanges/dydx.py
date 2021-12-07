@@ -24,6 +24,7 @@ LOG = logging.getLogger('feedhandler')
 class dYdX(Feed, dYdXRestMixin):
     id = DYDX
     symbol_endpoint = 'https://api.dydx.exchange/v3/markets'
+    websocket_endpoint = 'wss://api.dydx.exchange/v3/ws'
     websocket_channels = {
         L2_BOOK: 'v3_orderbook',
         TRADES: 'v3_trades',
@@ -45,54 +46,49 @@ class dYdX(Feed, dYdXRestMixin):
             info['instrument_type'][s.normalized] = stype
         return ret, info
 
-    def __init__(self, **kwargs):
-        super().__init__('wss://api.dydx.exchange/v3/ws', **kwargs)
-        self.__reset()
-
     def __reset(self):
         self._l2_book = {}
-        self.offsets = {}
+        self._offsets = {}
 
     async def _book(self, msg: dict, timestamp: float):
         pair = self.exchange_symbol_to_std_symbol(msg['id'])
         delta = {BID: [], ASK: []}
 
         if msg['type'] == 'channel_data':
-            for side, data in msg['contents'].items():
-                if side == 'offset':
-                    offset = int(data)
-                    continue
-                side = BID if side == 'bids' else ASK
-                for entry in data:
-                    price = Decimal(entry[0])
-                    amount = Decimal(entry[1])
+            updated = False
+            offset = int(msg['contents']['offset'])
+            for side, key in ((BID, 'bids'), (ASK, 'asks')):
+                for data in msg['contents'][key]:
+                    price = Decimal(data[0])
+                    amount = Decimal(data[1])
 
-                    if price in self.offsets[pair] and offset <= self.offsets[pair][price]:
+                    if price in self._offsets[pair] and offset < self._offsets[pair][price]:
                         continue
 
-                    self.offsets[pair][price] = offset
+                    updated = True
+                    self._offsets[pair][price] = offset
+                    delta[side].append((price, amount))
+
                     if amount == 0:
                         if price in self._l2_book[pair].book[side]:
                             del self._l2_book[pair].book[side][price]
-                        delta[side].append((price, 0))
                     else:
                         self._l2_book[pair].book[side][price] = amount
-                        delta[side].append((price, amount))
+            if updated:
+                await self.book_callback(L2_BOOK, self._l2_book[pair], timestamp, delta=delta, raw=msg)
         else:
             # snapshot
-            delta = None
             self._l2_book[pair] = OrderBook(self.id, pair, max_depth=self.max_depth)
-            self.offsets[pair] = {}
+            self._offsets[pair] = {}
 
             for side, data in msg['contents'].items():
                 side = BID if side == 'bids' else ASK
                 for entry in data:
-                    self.offsets[pair][Decimal(entry['price'])] = int(entry['offset'])
+                    self._offsets[pair][Decimal(entry['price'])] = int(entry['offset'])
                     size = Decimal(entry['size'])
                     if size > 0:
                         self._l2_book[pair].book[side][Decimal(entry['price'])] = size
-
-        await self.book_callback(L2_BOOK, self._l2_book[pair], timestamp, delta=delta, raw=msg)
+            await self.book_callback(L2_BOOK, self._l2_book[pair], timestamp, delta=None, raw=msg)
 
     async def _trade(self, msg: dict, timestamp: float):
         """

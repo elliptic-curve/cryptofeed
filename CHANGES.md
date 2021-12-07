@@ -1,13 +1,41 @@
 ## Changelog
 
-### 2.1.0
+### 2.1.2
+ * Feature: Tweak Postgres backend to not store duplicated data for orderbooks.
+ * Feature: Provide sample book schema for Postgres.
+ * Feature: Add subaccount info to OrderInfo and Fills data types.
+ * Bugfix: Fix issue in orderbook cross check.
+ * Bugfix: Simplify dYdX orderbook logic.
+ * Bugfix: Raise error if client tries to subscribe to KuCoin book data without an API key.
+ * Feature: Add ByBit sandbox endpoints.
+
+### 2.1.1 (2021-11-29)
+ * Bugfix: Position data type missing side field.
+ * Bugfix: Position data type had unused field 'id'.
+ * Bugfix: Fix Bybit OrderInfo msg/data dict.
+ * Feature: Add support for sandbox/testnet on BinanceFutures.
+ * Feature: New exchange - Crypto.com.
+ * Bugfix: Fix MongoDB backend.
+ * Update: reduce code duplication for candle interval normalization.
+ * Update: Simplify code around address specification and selection when using sandbox/testnet.
+ * Bugfix: Phemex rounding errors, incorrect volume.
+ * Feature: Add sandbox/testnet endpoint for Phemex.
+ * Feature: New exchange - Delta.
+ * Update: Tweak tests to remove deprecation warnings.
+ * Bugfix: Fix token usage in Binance.
+ * Update: Change Binance trades to use trade timestamp instead of event timestamp.
+
+### 2.1.0 (2021-11-14)
  * Bugfix: Update binance user data streams to use cdef types.
  * Feature: Add none_to kwarg to to_dict method of data type objects. Allows replacmen of Nones with specified value.
  * Bugfix: Some redis backends were trying to write Nones to storage and failing.
- * Uodate: Renamed as_type kwarg on to_dict to numeric_type.
+ * Update: Renamed as_type kwarg on to_dict to numeric_type.
  * Bugfix: Some dYdX symbols were incorrectly classified as spot.
  * Update: Drop support for Python 3.7.
  * Bugfix: Orderbooks need to be truncated to the correct depth when max depth is smaller than the maximum on Kraken.
+ * Update: Coinbase having similar issues other exchanges with websocket compliance. Updated to fix connection
+ * Update: Backends will fill in missing timestamps with receipt_timestamp
+ * Update: Okex auth channel Orders added
 
 ### 2.0.3 (2021-10-26)
  * Bugfix: Use timestamp_e6 for data derived from Bybit's instrument_info data feed.
@@ -47,7 +75,7 @@
  * Bugfix: Upbit REST candles do not work when start/end are not specified
  * Bugfix: New version of websockets enforces RFC rules and non-compliant exchanges will fail to connect.
  * Feature: Add support for candles on Bitfinex REST
- * Bugfix: Book callback with cross_check option enabled causes an error 
+ * Bugfix: Book callback with cross_check option enabled causes an error
  * Bugfix: Kraken Candle timestamps strings instead of floats
  * Bugfix: Coinbase book \_change handler passing wrong book type
  * Bugfix: dYdX orderbooks contained prices levels of size 0
@@ -152,7 +180,7 @@
   * Update: previous HitBTC & Bitcoin.com websocket endpoints deprecated. Now using separate Market, Trading and Account endpoints
   * Bugfix: max_depth on Binance and Kraken was not properly used when querying the snapshot
   * Bugfix: Handle 429s in HTTP connections (by waiting and retrying).
-  
+
 ### 1.9.1 (2021-06-10)
   * Feature: add Bithumb exchange - l2 book and trades
   * Bugfix: Fix inverted Poloniex symbols
@@ -173,7 +201,7 @@
   * Update: Remove deprecated channel mapping from Kraken, use channel name from message instead
   * Bugfix: change Kraken Futures to use the standard symbol to be consistent with the rest of the library
   * Update: use Kucoin v3 endpoint for orderbook snapshot (v2 deprecated).
-  * Update: Poloniex ticker message format update 
+  * Update: Poloniex ticker message format update
 
 ### 1.9.0 (2021-04-25)
   * Bugfix: Fix Binance subscriptions when subscribing to more than one candle
