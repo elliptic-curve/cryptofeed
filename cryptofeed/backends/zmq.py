@@ -1,5 +1,5 @@
 '''
-Copyright (C) 2017-2021  Bryant Moscon - bmoscon@gmail.com
+Copyright (C) 2017-2022 Bryant Moscon - bmoscon@gmail.com
 
 Please see the LICENSE file for the terms and conditions
 associated with this software.
@@ -76,3 +76,11 @@ class BalancesZMQ(ZMQCallback, BackendCallback):
 
 class PositionsZMQ(ZMQCallback, BackendCallback):
     default_key = 'positions'
+
+
+class OrderInfoZMQ(ZMQCallback, BackendCallback):
+    default_key = 'order_info'
+
+
+class FillsZMQ(ZMQCallback, BackendCallback):
+    default_key = 'fills'

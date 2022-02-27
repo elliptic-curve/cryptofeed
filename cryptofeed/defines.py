@@ -1,5 +1,5 @@
 '''
-Copyright (C) 2017-2021  Bryant Moscon - bmoscon@gmail.com
+Copyright (C) 2017-2022 Bryant Moscon - bmoscon@gmail.com
 
 Please see the LICENSE file for the terms and conditions
 associated with this software.
@@ -18,6 +18,7 @@ BINANCE = 'BINANCE'
 BINANCE_US = 'BINANCE_US'
 BINANCE_FUTURES = 'BINANCE_FUTURES'
 BINANCE_DELIVERY = 'BINANCE_DELIVERY'
+BITDOTCOM = 'BIT.COM'
 BITFLYER = 'BITFLYER'
 BITSTAMP = 'BITSTAMP'
 BITTREX = 'BITTREX'
@@ -94,6 +95,10 @@ MAKER_OR_CANCEL = 'maker-or-cancel'
 FILL_OR_KILL = 'fill-or-kill'
 IMMEDIATE_OR_CANCEL = 'immediate-or-cancel'
 GOOD_TIL_CANCELED = 'good-til-canceled'
+TRIGGER_LIMIT = 'trigger-limit'
+TRIGGER_MARKET = 'trigger-market'
+MARGIN_LIMIT = 'margin-limit'
+MARGIN_MARKET = 'margin-market'
 
 OPEN = 'open'
 PENDING = 'pending'

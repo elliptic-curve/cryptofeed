@@ -1,5 +1,5 @@
 '''
-Copyright (C) 2017-2021  Bryant Moscon - bmoscon@gmail.com
+Copyright (C) 2017-2022 Bryant Moscon - bmoscon@gmail.com
 
 Please see the LICENSE file for the terms and conditions
 associated with this software.
@@ -20,10 +20,9 @@ class RedisCallback(BackendQueue):
         key used in redis. The defaults are related to the data
         being stored, i.e. trade, funding, etc
 
-        writer_interval:
-        the frequency writer sleep when there is nothing in
-        data queue. 0 makes this thread consuming a lot of CPU.
-        while large interval put pressure on queue.
+        writer_interval: float
+            the frequency writer sleeps when there is nothing in the queue.
+            0 consumes a lot of CPU, while large interval puts pressure on queue.
         """
         prefix = 'redis://'
         if socket:

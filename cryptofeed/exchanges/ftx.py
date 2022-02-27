@@ -1,5 +1,5 @@
 '''
-Copyright (C) 2017-2021  Bryant Moscon - bmoscon@gmail.com
+Copyright (C) 2017-2022 Bryant Moscon - bmoscon@gmail.com
 
 Please see the LICENSE file for the terms and conditions
 associated with this software.
@@ -16,7 +16,7 @@ import pandas as pd
 
 import json
 
-from cryptofeed.connection import AsyncConnection
+from cryptofeed.connection import AsyncConnection, RestEndpoint, Routes, WebsocketEndpoint
 from cryptofeed.defines import BID, ASK, BUY, CLOSED, FUTURES, LIMIT, MAKER, MARKET, OPEN, ORDER_INFO, PERPETUAL, SPOT, SUBMITTING, FILLS, TAKER
 from cryptofeed.defines import FTX as FTX_id
 from cryptofeed.defines import FUNDING, L2_BOOK, LIQUIDATIONS, OPEN_INTEREST, SELL, TICKER, TRADES, FILLED
@@ -32,8 +32,9 @@ LOG = logging.getLogger('feedhandler')
 
 class FTX(Feed, FTXRestMixin):
     id = FTX_id
-    symbol_endpoint = "https://ftx.com/api/markets"
-    websocket_endpoint = 'wss://ftx.com/ws/'
+    websocket_endpoints = [WebsocketEndpoint('wss://ftx.com/ws/', options={'compression': None})]
+    rest_endpoints = [RestEndpoint('https://ftx.com', routes=Routes('/api/markets', open_interest='/api/futures/{}/stats', funding='/api/funding_rates?future={}', stats='/api/futures/{}/stats'))]
+
     websocket_channels = {
         L2_BOOK: 'orderbook',
         TRADES: 'trades',
@@ -88,10 +89,6 @@ class FTX(Feed, FTXRestMixin):
             info['quantity_step'][s.normalized] = d['sizeIncrement']
             info['instrument_type'][s.normalized] = s.type
         return ret, info
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.ws_defaults['compression'] = None
 
     def __reset(self):
         self._l2_book = {}
@@ -164,8 +161,7 @@ class FTX(Feed, FTXRestMixin):
                 # OI only for perp and futures, so check for / in pair name indicating spot
                 if '/' in pair:
                     continue
-                end_point = f"https://ftx.com/api/futures/{pair}/stats"
-                data = await self.http_conn.read(end_point)
+                data = await self.http_conn.read(self.rest_endpoints[0].route('open_interest', sandbox=self.sandbox).format(pair))
                 received = time()
                 data = json.loads(data, parse_float=Decimal)
                 if 'result' in data:
@@ -200,9 +196,9 @@ class FTX(Feed, FTXRestMixin):
             for pair in pairs:
                 if '-PERP' not in pair:
                     continue
-                data = await self.http_conn.read(f"https://ftx.com/api/funding_rates?future={pair}")
+                data = await self.http_conn.read(self.rest_endpoints[0].route('funding', sandbox=self.sandbox).format(pair))
                 data = json.loads(data, parse_float=Decimal)
-                data2 = await self.http_conn.read(f"https://ftx.com/api/futures/{pair}/stats")
+                data2 = await self.http_conn.read(self.rest_endpoints[0].route('stats', sandbox=self.sandbox).format(pair))
                 data2 = json.loads(data2, parse_float=Decimal)
                 received = time()
                 data['predicted_rate'] = Decimal(data2['result']['nextFundingRate'])

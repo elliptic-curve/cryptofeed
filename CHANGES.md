@@ -1,6 +1,32 @@
 ## Changelog
 
-### 2.1.2
+### 2.2.1
+ * Feature: Support for order info stream on BitMex
+ * Bugfix: Datetime/Timestamp conversion fixes
+ * Feature: Add support for Huobi Linear Swaps
+ * Update: Change Coinbase REST calls to use Ticker and Trade data types
+ * Bugfix: Instrument and channel filtering sometimes matched incorrectly when creating connection specific subscriptions
+ * Bugfix: retry kwargs were not correctly passed through to the async HTTP connection handler in Coinbase REST methods
+ * Update: Revamp Coinbase authenticated REST endpoints; change to use the Cython data types
+ * Feature: Add from_dict static method in Cython types to support creation of object from dict (for serialization/deserialization)
+ 
+### 2.2.0 (2021-02-16)
+ * Feature: New exchange: Bit.com
+ * Feature: Rework how exchanges that have multiple websocket endpoints are managed and configured.
+ * Bugfix: Use UTC for datetime conversions in REST api
+ * Bugfix: Funding rate of 0 was being converted to None when to_dict was called
+ * Feature: Add OKEx REST API and implement candle function
+ * Feature: Added trading endpoints to Bitfinex REST mixin
+ * Bugfix: Change to Okex to allow futures and options subscriptions
+ * Update: Deribit ticker, trades, and orderbook channels now require authentication
+ * Bugfix: Fix candle backend for InfluxDB
+ * Bugfix: OKEx REST candle fix
+ * Feature: Added ability to use your own Postgres table layouts
+ * Bugfix: Binance connections that do not require websocket were failing on connect
+ * Feature: Write native datetimes to Mongo
+ * Feature: Mongo backend now supports bulk writes + queuing of messages
+
+### 2.1.2 (2021-12-23)
  * Feature: Tweak Postgres backend to not store duplicated data for orderbooks.
  * Feature: Provide sample book schema for Postgres.
  * Feature: Add subaccount info to OrderInfo and Fills data types.
@@ -8,6 +34,9 @@
  * Bugfix: Simplify dYdX orderbook logic.
  * Bugfix: Raise error if client tries to subscribe to KuCoin book data without an API key.
  * Feature: Add ByBit sandbox endpoints.
+ * Bugfix: Fix calculation in OrderInfo on Binance.
+ * Feature: Support list of bootstrap servers for Kafka backend.
+ * Feature: Add OrderInfo and Fills zmq callbacks 
 
 ### 2.1.1 (2021-11-29)
  * Bugfix: Position data type missing side field.

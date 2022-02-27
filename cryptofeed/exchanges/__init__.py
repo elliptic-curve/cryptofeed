@@ -1,11 +1,12 @@
 '''
-Copyright (C) 2017-2021  Bryant Moscon - bmoscon@gmail.com
+Copyright (C) 2017-2022 Bryant Moscon - bmoscon@gmail.com
 
 Please see the LICENSE file for the terms and conditions
 associated with this software.
 '''
 from cryptofeed.defines import *
 from cryptofeed.defines import FTX as FTX_str, EXX as EXX_str, FMFW as FMFW_str
+from .bitdotcom import BitDotCom
 from .phemex import Phemex
 from .ascendex import AscendEX
 from .bequant import Bequant
@@ -54,6 +55,7 @@ EXCHANGE_MAP = {
     BINANCE_US: BinanceUS,
     BINANCE: Binance,
     FMFW_str: FMFW,
+    BITDOTCOM: BitDotCom,
     BITFINEX: Bitfinex,
     BITFLYER: Bitflyer,
     BITHUMB: Bithumb,

@@ -1,5 +1,5 @@
 '''
-Copyright (C) 2017-2021  Bryant Moscon - bmoscon@gmail.com
+Copyright (C) 2017-2022 Bryant Moscon - bmoscon@gmail.com
 
 Please see the LICENSE file for the terms and conditions
 associated with this software.
@@ -124,3 +124,10 @@ class LiquidationsInflux(InfluxCallback, BackendCallback):
 
 class CandlesInflux(InfluxCallback, BackendCallback):
     default_key = 'candles'
+
+    async def write(self, data):
+        timestamp = data["timestamp"]
+        timestamp_str = f',timestamp={timestamp}' if timestamp is not None else ''
+        trades = f',trades={data["trades"]},' if data['trades'] else ','
+        update = f'{self.key}-{data["exchange"]},symbol={data["symbol"]},interval={data["interval"]} start={data["start"]},stop={data["stop"]}{trades}open={data["open"]},close={data["close"]},high={data["high"]},low={data["low"]},volume={data["volume"]}{timestamp_str},receipt_timestamp={data["receipt_timestamp"]} {int(data["receipt_timestamp"] * 1000000)}'
+        await self.queue.put({'data': update, 'headers': self.headers})
