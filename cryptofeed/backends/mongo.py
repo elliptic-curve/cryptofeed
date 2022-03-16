@@ -35,7 +35,6 @@ class MongoCallback:
         self.start={}
         self.running = True
         self.exited = False
-        self.writer_interval = writer_interval
 
     async def stop(self):
         self.running = False

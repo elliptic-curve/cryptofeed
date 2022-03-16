@@ -10,7 +10,7 @@ from datetime import datetime as dt
 from decimal import Decimal
 import logging
 
-from yapic import json
+import json
 
 from cryptofeed.exchange import RestExchange
 from cryptofeed.types import Candle
